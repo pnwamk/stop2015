@@ -1,38 +1,41 @@
 #lang typed/racket
 
-(define (string-reverse [x : String]) : String x)
-(define (symbol-reverse [x : Symbol]) : Symbol x)
+(define-type Int Integer)
 
-(: reversal 
-   (case->
-    [-> String String]
-    [-> Symbol Symbol]
-    [-> (U String Symbol)  
-        (U String Symbol)]))
-(define (reversal x)
+(: inc (case-> [-> Int Int]
+               [-> Flonum Flonum]
+               [-> (U Int Flonum)  
+                   (U Int Flonum)]))
+(define (inc x)
   (cond
-    [(string? x) (string-reverse x)]
-    [else (symbol-reverse x)]))
+    [(exact-integer? x) (add1 x)]
+    [else (+ .1 x)]))
 
-(: silly-string
-   (-> (U String Symbol)
-       String))
-(define (silly-string y)
-  (define y* (reversal y))
-  (cond
-    [(string? y*) (string-append y y*)]
-    [else (string-append
-           (symbol->string y)
-           (symbol->string y*))]))
+(: next-num (-> (U Int Flonum) Int))
+(define (next-num y)
+  (let ([z (inc y)])
+    (if (flonum? z)
+        (exact-ceiling z)
+        y)))
 
-(: safe-vec-ref
+#;(^-> [-> Int Int]
+       [-> Flonum Flonum])
+
+#;(-> [d : (U Int Flonum)]
+      [r : (U Int Flonum)
+         (or (and (d : Int) 
+                  (r : int))
+             (and (d : Flonum) 
+                  (r : flonum)))])
+
+#;(: safe-vec-ref
    (All (α) (->i [v : (Vectorof α)]
                  [i : Integer (≤ i (vec-len v))]
                  α)))
-(define (safe-vec-ref v i)
+#;(define (safe-vec-ref v i)
   (unsafe-vector-ref v i))
 
-(define (dot-product v1 v2)
+#;(define (dot-product v1 v2)
   (for/sum ([i (in-range 0 (vec-len v1))])
     (* (safe-vec-ref v1 i)
        (safe-vec-ref v2 i))))

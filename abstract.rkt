@@ -1,4 +1,4 @@
-#lang at-exp scribble/sigplan @nocopyright @notimes 
+#lang scribble/sigplan @nocopyright @notimes 
 
 @(require scribble/manual
           andmkent-bib
@@ -28,63 +28,67 @@ extension.
 
 In order to typecheck a language such as Racket, Typed Racket
 employs features not found in traditional type systems. Consider
-this somewhat generic string/symbol reverse function @racket[reversal]:
+a simple increment function @racket[inc]:
 
-@racketblock[(define (reversal x)
+@racketblock[(define (inc x)
                (cond
-                 [(string? x) (string-reverse x)]
-                 [else (symbol-reverse x)]))]
+                 [(exact-integer? x) (add1 x)]
+                 [else (+ .1 x)]))]
 
-Typed Racket, with it's usage of untagged unions and 
-linear intersections of function types, allows 
-@racket[reversal]'s type to contain detailed 
+Typed Racket, with its usage of untagged unions and 
+ordered function intersections, allows 
+@racket[inc]'s type to contain detailed 
 information about its specification:
 
-@racketblock[(: reversal 
-                (case->
-                 [-> String String]
-                 [-> Symbol Symbol]
-                 [-> (U String Symbol)  
-                     (U String Symbol)]))]
+@racketblock[(: inc (case-> [-> Int Int]
+                            [-> Flonum Flonum]
+                            [-> (U Int Flonum)  
+                                (U Int Flonum)]))]
              
-Unfortunately, as the type illustrates, the specificity of
-@racket[reversal]'s range type depends on a priori
-knowledge about the input type. Calling @racket[reversal]
-with a value of type @racket[(U String Symbol)] causes
-the relation between the input and output types to be forgotten. This
-loss of information means some sound programs, such as our 
-@racket[silly-string] below, will not typecheck:
+When typechecking function application, ordered intersections are 
+fixed to the first suitable function type based on context.
+Because of this, calling @racket[inc] with a value of 
+type @racket[(U Int Flonum)] causes the relation between 
+the input and output types to be forgotten. This loss of information 
+means some sound programs, such as our @racket[next-num] below, 
+will not typecheck:
 
-@racketblock[(: silly-string
-                (-> (U String Symbol) String))
-
-             (define (silly-string y)
-               (define y* (reversal y))
-               (cond
-                 [(string? y*) (string-append y y*)]
-                 [else (string-append
-                        (symbol->string y)
-                        (symbol->string y*))]))]
+@racketblock[(: next-num (-> (U Int Flonum) Int))
+             (define (next-num y)
+               (let ([z (inc y)])
+                 (if (flonum? z)
+                     (exact-ceiling z)
+                     y)))]
+@(image "tcerror.png"
+        #:scale .33)
 
 Our work extending Typed Racket offers @bold{logical refinement types} 
-as a solution to this problem. Instead of using a simple 
-@racket[case->] for the type of @racket[reversal], we can use a single function 
-type which @emph{refines} the range based on its dependent relation with the 
-input type (@emph{we syntactically borrow } @racket[->i] 
-@emph{from Racket's dependent contracts}):
+as a solution to this class of problems. Logical refinements allow us to
+specify a subset of type τ where a logical proposition ψ holds, written
+as {x : τ | ψ}. For @racket[inc], we can use refinements
+to express this relation between input and output types:
 
-@racketblock[(: reversal
-                (->i [x : (U String Symbol)]
-                     [res (x) : (U String Symbol)
-                          (or (and [x res : String])
-                              (and [x res : Symbol]))]))]
+@racketblock[(-> [d : (U Int Flonum)]
+                 {r : (U Int Flonum)
+                    (or (and [d : Int] 
+                             [r : int])
+                        (and [d : Flonum] 
+                             [r : flonum]))})]
 
-With this dependently typed specification for @racket[reversal]
+Because this is a common pattern (and the propositions can quickly
+become quite verbose) we abbreviate these sorts of dependent function
+types as follows:
+
+
+@racketblock[(^-> [-> Int Int]
+                  [-> Flonum Flonum])]
+
+With this simple dependently typed specification for @racket[inc],
 Typed Racket is now able to correctly associate the types of @racket[y] 
-and @racket[y*] in @racket[silly-string], allowing it to successfully typecheck.
-This program is one simple example of a class of programs which rely 
-on this sort of dependent type-based reasoning that may now be gradually 
-typed in Racket while requiring little or no modification.
+and @racket[z] in @racket[next-num]---we are not forced to alter our program
+to successfully typecheck. This program is one simple example of a class of
+programs which rely dependent type-based reasoning that may now be gradually 
+typed in Racket with little or no modification.
 
 
 @section{Linear Integer Constraints}
