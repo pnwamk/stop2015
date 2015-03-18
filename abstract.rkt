@@ -24,77 +24,107 @@ refinement types and linear integer constraints. This abstract
 discusses our findings and current progress in implementing this
 extension.
 
-@section{Logical Refinement Types}
+@section{Refining already logical types}
 
-In order to typecheck a language such as Racket, Typed Racket
-employs features not found in traditional type systems. Consider
-a simple increment function @racket[inc]:
+In order to effectively typecheck idiomatic code in a dynamically typed 
+language like Racket, Typed Racket (TR) employs features not found in 
+traditional type systems. One such key feature is @emph{occurrence typing}.
+Simply put, occurrence typing allows different occurrences of the same
+term in a program to have different types based on the logical results of 
+conditional control flow. This is accomplished by having the type system 
+track the type-based logical propositions implied by the results of
+conditional tests and allows logical combinations of type-related testing,
+such as those seen in the function @racket[foo], to aid typechecking:
 
-@racketblock[(define (inc x)
-               (cond
-                 [(exact-integer? x) (add1 x)]
-                 [else (+ .1 x)]))]
+@#reader scribble/comment-reader
 
-Typed Racket, with its usage of untagged unions and 
-ordered function intersections, allows 
-@racket[inc]'s type to contain detailed 
-information about its specification:
+@(racketblock
+  (define (foo [x : (U Number String)] 
+               [p : (Pairof Any Any)])
+    (cond
+      [(and (number? x) (number? (car p)))
+       ;; [x : Number] ∧ [(car p) : Number]
+       (+ x (car p))]
+      ;; ¬[x : Number] ∨ ¬[(car p) : Number]
+      [(number? (car p))
+       ;; [(car p) : Number]
+       ;; thus [x : String]
+       (+ (string-length x) (car p))]
+      ;; ¬[(car p) : Number]
+      [else 0])))
 
-@racketblock[(: inc (case-> [-> Int Int]
-                            [-> Flonum Flonum]
-                            [-> (U Int Flonum)  
-                                (U Int Flonum)]))]
-             
-When typechecking function application, ordered intersections are 
-fixed to the first suitable function type based on context.
-Because of this, calling @racket[inc] with a value of 
-type @racket[(U Int Flonum)] causes the relation between 
-the input and output types to be forgotten. This loss of information 
-means some sound programs, such as our @racket[next-num] below, 
-will not typecheck:
+The importance of considering these typed-based 
+propositions is clear when observing the form
+typing judgment take on in TR @~cite[thf-icfp-2010]:
 
-@racketblock[(: next-num (-> (U Int Flonum) Int))
-             (define (next-num y)
-               (let ([z (inc y)])
-                 (if (flonum? z)
-                     (exact-ceiling z)
-                     y)))]
-@(image "tcerror.png"
-        #:scale .33)
+@centered{Γ ⊢ e : τ ; @bold{ψ}@subscript{+} | @bold{ψ}@subscript{-} ; o} 
 
-Our work extending Typed Racket offers @bold{logical refinement types} 
-as a solution to this class of problems. Logical refinements allow us to
-specify a subset of type τ where a logical proposition ψ holds, written
-as {x : τ | ψ}. For @racket[inc], we can use refinements
-to express this relation between input and output types:
+The two ψ terms in the judgment are the logical propositions 
+that hold when the term evaluates to a non-@racket[#f] value
+(@bold{ψ}@subscript{+}) or @racket[#f] (@bold{ψ}@subscript{-}) 
+and are key to successfully reasoning about interesting Racket 
+programs.
 
-@racketblock[(-> [d : (U Int Flonum)]
-                 {r : (U Int Flonum)
-                    (or (and [d : Int] 
-                             [r : int])
-                        (and [d : Flonum] 
-                             [r : flonum]))})]
+By utilizing these propositions already present in the type system 
+we can naturally extend TR's ability to describe how different values 
+relate to one another by adding @bold{logical refinement types}
+of the form {x : τ | ψ}. These types define a subset of τ where ψ 
+holds, allowing us to describe a new class of types for functions
+such as the following @racket[flexible-append]:
 
-Because this is a common pattern (and the propositions can quickly
-become quite verbose) we abbreviate these sorts of dependent function
-types as follows:
+@racketblock[(define (flexible-append x y)
+              (cond
+                [(string? x) (string-append x y)]
+                [else (append x y)]))]
+
+This function is meant to take either two strings or lists
+and will produce a result with the same type as the two
+arguments. With our addition of refinements, we can now
+precisely describe this function's behavior:
+
+@racketblock[([x : (U (Listof Any) String)]
+              [y : (U (Listof Any) String)
+                 (or (and [x : (Listof Any)]
+                          [y : (Listof Any)])
+                     (and [x : String]
+                          [y : String]))]
+              -> 
+              [result : (U (Listof Any) String)
+                      (or (and [x : (Listof Any)]
+                               [result : (Listof Any)])
+                          (and [x : String]
+                               [result : String]))])]
+
+Since this is a potentially comment pattern (and the above
+type is painfully verbose) we can introduce a simple 
+combinator notation that describes a function whose 
+argument(s) and return type(s) depend on one another:
+
+@racketblock[(^-> 
+              [String String -> String]
+              [(Listof Any) (Listof Any) -> (Listof Any)])]
+
+As an interesting aside, the lack of this feature has actually 
+been a subtle point of confusion for many users learning TR.
+While adding types to Racket code, many have assumed, for 
+functions overloaded with several types, that TR would be able 
+to fully reason about the dependent relations they 
+intuitively saw while writing their code. Hopefully this 
+feature not only adds expresiveness, but also helps bring
+TR one step closer towards a point where programs may be 
+gradually typed in the most natural way possible.
 
 
-@racketblock[(^-> [-> Int Int]
-                  [-> Flonum Flonum])]
+@section{With a side of integer inequalities, please!}
 
-With this simple dependently typed specification for @racket[inc],
-Typed Racket is now able to correctly associate the types of @racket[y] 
-and @racket[z] in @racket[next-num]---we are not forced to alter our program
-to successfully typecheck. This program is one simple example of a class of
-programs which rely dependent type-based reasoning that may now be gradually 
-typed in Racket with little or no modification.
-
-
-@section{Linear Integer Constraints}
+@centered{@emph{``God made the integers, all else is the work of man.'' 
+                -- Leopold Kronecker}}
 
 Discuss @bold{linear integer constraints}, similar approach to that
-of Dependent ML @~cite[x-jfp-2007], show quickly the below example, etc...
+of Dependent ML @~cite[x-jfp-2007],  it's a lightweight, practical extension,
+ties in perfectly with the logical flow of facts we already have,
+doesn't add any huge dependencies but adds a lot of expressiveness. 
+show quickly the below example, etc...
 
 @racketblock[(: safe-vec-ref
                 (∀ (α) (->i [v : (Vectorof α)]
