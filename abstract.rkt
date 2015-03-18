@@ -95,10 +95,10 @@ precisely describe this function's behavior:
                           (and [x : String]
                                [result : String]))])]
 
-Since this is a potentially comment pattern (and the above
+Since this is a potentially common pattern (and the above
 type is painfully verbose) we can introduce a simple 
 combinator notation that describes a function whose 
-argument(s) and return type(s) depend on one another:
+arguments and return types depend on one another:
 
 @racketblock[(^-> 
               [String String -> String]
@@ -106,7 +106,7 @@ argument(s) and return type(s) depend on one another:
 
 As an interesting aside, the lack of this feature has actually 
 been a subtle point of confusion for many users learning TR.
-While adding types to Racket code, many have assumed, for 
+While adding types to Racket code, many have falsely assumed, for 
 functions overloaded with several types, that TR would be able 
 to fully reason about the dependent relations they 
 intuitively saw while writing their code. Hopefully this 
