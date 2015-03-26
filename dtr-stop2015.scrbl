@@ -59,8 +59,8 @@ version of @racket[add1]'s type looks like without these refinements:
                       -> (U Integer Float)])]
 
 Using simple function overloading we can express how prior knowledge
-about the argument type gives us a more specific return type (@emph{e.g. add1 acts as a binary
-operator for the type @racket[Integer]}). However, this relation between input and output is easily lost:
+about the argument type gives us a more specific return type (@emph{e.g. @racket[add1] is a unary
+operator over the @racket[Integer] type}). However, this relation between input and output is easily lost:
 calling @racket[add1] with something of type @racket[(U Integer Float)] means the fact that the
 return value is of type @racket[Integer] iff the argument was of type @racket[Integer] is
 lost. The typechecker chooses the first valid function type and checks the rest of the program.
@@ -132,9 +132,29 @@ such as @racket[add1], we can describe the function's behavior so
 other programs may successfully verify contexts in which it is used:
 
 @racketblock[(dependent->
-              [[n : Integer] -> [n* : Integer
-                                    (= n* (+ 1 n))]]
+              [[n : Integer] -> [m : Integer
+                                    (= m (+ 1 n))]]
               [Float -> Float])]
+
+
+@section{Playing nice with the dynamically typed world}
+
+Because of the relatively simple nature of our dependent types,
+it is easy to see the mapping between our type extensions 
+and the well studied dependent contracts already present
+in the Racket standard libraries @~cite[dthf-esop-2012]. For
+example, the dependent specification we gave for
+@racket[add1] is easy to express as a run-time contract:
+
+@racketblock[(->i ([n (or/c exact-integer? flonum?)])
+                  [m (n) (or/c (and/c exact-integer?
+                                      (=/c (+ 1 n)))
+                               flonum?)])]
+
+Because of this parellel in expressiveness, we anticipate being
+able to provide full sound, performant interoperability between
+traditional Racket modules and TR modules utilizing dependent types.
+
 
 @section{Dependently typing the numeric tower?}
 
@@ -163,15 +183,6 @@ there may be an interesting balance between the expresiveness of
 integer refinements and the simplicity of nominal subtypes that is
 only uncoverable through experimentation.
 
-
-@section{Playing nice with the dynamically typed world}
-
-Because of the relatively simple nature of our dependent types,
-there should be a direct mapping between our type extensions 
-and the well studied dependent contracts already present in the Racket
-standard libraries @~cite[dthf-esop-2012]. This should allow us to provide
-sound, performant interoperability between traditional Racket
-modules and TR modules utilizing dependent types.
 
 
 @section{Related Work}
