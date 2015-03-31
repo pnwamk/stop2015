@@ -7,7 +7,7 @@
           
 @(define-cite ~cite citet generate-bibliography)
 
-@(title "Enriching Typed Racket with Practical Dependent Types")
+@(title "Practical Dependent Types in Typed Racket")
 
 @(authorinfo "Andrew M. Kent" "Indiana University" "andmkent@indiana.edu")
 @(authorinfo "Sam Tobin-Hochstadt" "Indiana University" "samth@indiana.edu")
