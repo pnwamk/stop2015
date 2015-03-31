@@ -12,25 +12,27 @@
 @(authorinfo "Andrew M. Kent" "Indiana University" "andmkent@indiana.edu")
 @(authorinfo "Sam Tobin-Hochstadt" "Indiana University" "samth@indiana.edu")
 
-Typed Racket is a statically-typed dialect of Racket that allows
-idiomatic Racket programs to be enriched with types.  It can reason
-about many dynamically typed programming patterns @emph{while}
+@abstract{Typed Racket is a statically-typed dialect of Racket that
+allows idiomatic Racket programs to be enriched with types.  It can
+reason about many dynamically typed programming patterns @emph{while}
 providing sound interoperability and optimizations.  We have designed
-and modeled an extension to Typed Racket's core calculus which will
-add support for logical refinement types and linear integer
-constraints. This abstract discusses our work implementing this novel
-combination of precise specifications and optimizations which maintain
-sound interoperability with dynamically typed code.
+and implemented an extension to Typed Racket which adds support for
+logical refinement types and linear integer constraints. This summary
+discusses our approach to implementing this novel combination of
+precise specifications and optimizations while maintaining sound
+interoperability with dynamically typed code.}
 
-@section{Refining already logical types}
+@section{Refining @emph{already} logical types}
 
-In order to typecheck dynamically typed idioms and provide sound
-interoperability, Typed Racket utilizes a unique set of features. One
-such feature is @emph{occurrence typing}, which allows different
-occurrences of the same term in a program to be typechecked as
+In order to typecheck dynamically typed idioms Typed Racket utilizes
+@emph{occurrence typing}, a technique which allows different
+occurrences of the same term in a program to be typechecked at
 different types. This is accomplished by tracking the type-based
-information (@emph{i.e. logical propositions}) implied by the results
-of conditional tests:
+logical information implied by the results of conditional tests.  For
+example, to typecheck the function @racket[plus1] we begin with the
+logical assumption that @racket[x] is of type @racket[(U Fixnum
+Float)], an untagged union type describing values of type
+@racket[Fixnum] @emph{or} @racket[Float]:
 
 @(racketblock
   (define (plus1 [x : (U Fixnum Float)])
@@ -38,20 +40,24 @@ of conditional tests:
         (fx+ x 1)
         (fl+ x 1.0))))
 
-In @racket[plus1], @racket[x] is initially known to be of type
-@racket[Fixnum] @emph{or} @racket[Float]. The logical propositions
-implied by @racket[(fixnum? x)]'s result---@racket[(x : Fixnum)] and
-@racket[¬(x : Fixnum)]---are then appropriately added to the type
-environment while checking each branch, thus allowing the
-type-specific versions of @racket[+] to typecheck.
+We then typecheck the test-expression of the @racket[if],
+@racket[(fixnum? x)], and record the type-based logical propositions
+its result would imply: if the test evaluates to a non-@racket[#f]
+value then @racket[x] @emph{is} a @racket[Fixnum], otherwise
+@racket[x] @emph{is not} a @racket[Fixnum]. To typecheck the then and
+else branches, we combine the appropriate implied proposition from
+testing @racket[(fixnum? x)] with our initial assumption that
+@racket[x] is of type @racket[Fixnum] @emph{or} @racket[Float]. This
+allows us to correctly conclude that @racket[x] is a @racket[Fixnum]
+in @racket[(fx+ x 1)] and a @racket[Float] in @racket[(fl+ x 1.0)].
 
-By utilizing these logical typed-based propositions @emph{within
-types} we can naturally extend Typed Racket to relate the types of
-different values. To this end, we have added @bold{logical refinement
-types} of the form {x : τ | ψ}.  This type defines a subset of type τ
-where the logical proposition ψ holds, allowing us to more precisely
-type many programs. For example, consider what a precise type for
-@racket[plus1]'s might look like without these refinements:
+By utilizing these same logical typed-based propositions @emph{within
+types} we can naturally extend Typed Racket to @emph{relate} the types
+of different values. To this end, we have added @bold{logical
+refinement types} of the form {x : τ | ψ}. This type defines a subset
+of type τ where the logical proposition ψ holds, allowing us to more
+precisely type many programs. For example, consider what a precise
+type for @racket[plus1] might look like without these refinements:
 
 @racketblock[(case->
               [Fixnum -> Fixnum]
@@ -59,19 +65,18 @@ type many programs. For example, consider what a precise type for
               [(U Fixnum Float)
                -> (U Fixnum Float)])]
 
-Using simple function overloading we can express how prior knowledge
-about the argument type gives us a more specific return
-type (@emph{e.g. @racket[plus1] is a unary operator over the
-@racket[Fixnum] type}). However, this relation between input and
-output is easily lost: calling @racket[plus1] with something of type
+@racket[case->] constructs an ordered function intersection type,
+which serves as a simple overloading technique that can express how
+prior knowledge about the argument type gives us a more specific
+return type. Unfortunately, the relation between input and output type
+is easily lost: calling @racket[plus1] with something of type
 @racket[(U Fixnum Float)] means the fact that the return value is of
 type @racket[Fixnum] iff the argument was of type @racket[Fixnum] is
 forgotten. The typechecker chooses the first valid function type and
 continues checking the rest of the program.
 
-Using our logical refinements, however, we can exactly describe this
-function's behavior:
-
+By using a simple logical refinement, however, we can exactly describe
+the relation bewteen the function's argument and return types:
 
 @racketblock[([in : (U Fixnum Float)]
               -> 
@@ -81,9 +86,10 @@ function's behavior:
                        (and [in  : Float]
                             [out : Float]))])]
 
-Since this is a common pattern, we can use a spoonful of
-syntactic-sugar to help users describe these sorts of dependent
-functions:
+This type refines the function's range using a logical proposition,
+stating the type of the argument and result must be equal. Since this
+is a common pattern, we can use a spoonful of syntactic-sugar to help
+users describe these sorts of dependent functions:
 
 @racketblock[(dependent-case->
               [Fixnum -> Fixnum]
@@ -95,16 +101,14 @@ readable, intuitive type definitions.
 @section{Verifying numeric constraints}
 
 In addition to supporting refinements that relate run-time values'
-types, we will support a decidable subset of integer constraints
-similar to those presented by Xi and Pfenning in Dependent ML
-@~cite[xp-popl-1999]. With this addition, Typed Racket will be able to
-automatically verify and eliminate many runtime checks for numeric
-constraints. For example, in the program @racket[norm] @note{Racket's
-@racket[for/sum] iterates like @racket[for], but each result of the
-body expression is accumulated into a result with @racket[+]} below,
-Typed Racket will be able to replace @racket[vector-ref] with its
-runtime-check-free counterpart @racket[unsafe-vector-ref] since the
-bounds-safety requirement can be statically guaranteed:
+types, we support a decidable subset of integer constraints similar to
+those presented by @citet[xp-popl-1999] in Dependent ML. With this
+addition, Typed Racket will be able to automatically verify and
+eliminate many runtime checks for numeric constraints. For example, in
+the program @racket[norm] below, Typed Racket will be able to
+replace @racket[vector-ref] with its faster counterpart
+@racket[unsafe-vector-ref] since the bounds-safety requirement can be
+statically guaranteed:
 
 @racketblock[(define (norm [v : (Vectorof Real)])
                (sqrt (for/sum ([i (vec-len v)])
@@ -117,9 +121,8 @@ optimizations---such as explicit uses @racket[unsafe-vector-ref]---in
 a safe, statically verified fashion:
 
 @racketblock[(define (safe-vec-ref
-                         [v : (Vectorof Real)]
-                         [i : Fixnum
-                            (≤ 0 (- (vec-len v) 1))])
+                      [v : (Vectorof Real)]
+                      [i : Natural (< i (vec-len v))])
                (unsafe-vector-ref v i))]
 
 
@@ -137,9 +140,8 @@ typechecker can enforce the precondition for vector
                     (safe-vec-ref v2 i))))]
 
 Similary, by applying these refinements to the return types of
-functions, such as @racket[plus1], we can more accurately describe
-their behavior so other programs may successfully verify contexts in
-which it is used:
+functions like @racket[plus1] we can more accurately describe their
+behavior so their usages can be more precisely checked:
 
 @racketblock[(dependent-case->
               [[n : Fixnum] -> [m : Fixnum
@@ -147,7 +149,7 @@ which it is used:
               [Float -> Float])]
 
 
-@section{Playing nice with the dynamically typed world}
+@section{Interoperating with the dynamically typed world}
 
 Because of the relatively simple nature of our dependent types, it is
 easy to see the mapping between our type extensions and the well
@@ -162,8 +164,8 @@ gave for @racket[plus1] is easy to express as a run-time contract:
 
 Because of this, we anticipate being able to provide sound, performant
 interoperability between traditional Racket modules and Typed Racket
-modules utilizing dependent types with no additional overhead for the
-user.
+modules utilizing dependent types with no additonal effort from our
+users.
 
 @section{Dependently typing the numeric tower}
 
@@ -172,7 +174,7 @@ features a rich numeric tower. The developers of Typed Racket have
 taken great care to ensure the types assigned to operations involving
 this tower are appropriately expressive@~cite[sthff-padl-2012]. This
 means that seemingly simple operations, such as @racket[+], may
-actually have a quite specific (@emph{i.e. verbose}) type to allow
+actually have a quite specific (@emph{and thus verbose}) type to allow
 more programs to typecheck:
 
 @racketblock[(case->
@@ -197,30 +199,30 @@ report on these costs.
 @section{Related Works}
 
 There is a history of using refinements and dependent types to enrich
-already existing type systems. Our method borrows inspiration from Xi
-and Pfenning, who added a practical set of dependent types to ML to
-allow for richer specifications and compiler optimizations
-@~cite[xp-popl-1999]. We similarly strive to provide an expressive yet
-practical extension which preserves the decidability of typechecking
-and requires no external support (@emph{e.g. an SMT solver}). Our
-approach, however, is designed explicitly to reason about a
-dynamically typed programming language and provide sound
-interoperability with code that provides no static type-guarantees.
+already existing type systems. Our method borrows inspiration from
+@citet[xp-popl-1999], who added a practical set of dependent types to
+ML to allow for richer specifications and compiler optimizations. We
+similarly strive to provide an expressive yet practical extension
+which preserves the decidability of typechecking and requires no
+external support (@emph{e.g. an SMT solver}). Our approach, however,
+is designed explicitly to reason about a dynamically typed programming
+language and provide sound interoperability with code that provides no
+static type-guarantees.
 
-Chugh et al. have shown how extensive use of dependent refinement
-types and an SMT solver can enable typechecking for complex,
-real-world JavaScript programs @~cite[chj-oopsla-2012]. Our system's
-usage of refinements to express dynamically typed idioms is similar,
-but we use a different approach for typechecking programs: our system
-is designed to allow for the direct expression of the mutually
-dependent subtyping and proves relations instead of translating
-problems into SMT-formatted queries. This allows us to express and
-reason about subtyping in the more traditional way and prevents
-potentially expensive external logical queries when relatively simple
-subtyping checks will suffice. Additionally, since our system is more
-tightly integrated with the compilation process, we can provide
-optimizations and guarantees of sound interoperability that Dependent
-JavaScript cannot.
+@citet[crj-popl-2012] have explored how extensive use of dependent
+refinement types and an SMT solver can enable typechecking for rich
+dynamicly type languages such as
+JavaScript@~cite[chj-oopsla-2012]. Our system's usage of refinements
+to express dynamically typed idioms is similar, but we use a different
+approach for typechecking programs: our system is designed to allow
+for the direct expression of the mutually dependent subtyping and
+proves relations instead of translating problems into SMT-formatted
+queries. This allows us to express and reason about subtyping in the
+more traditional way and prevents potentially expensive external
+logical queries when relatively simple subtyping checks will
+suffice. Additionally, since our system is more tightly integrated
+with the compilation process, we can provide optimizations and
+guarantees of sound interoperability that Dependent JavaScript cannot.
 
 Sage's use of dynamic runtime checks and static types is similar to
 our approach for providing sound interoperability between dynamically
