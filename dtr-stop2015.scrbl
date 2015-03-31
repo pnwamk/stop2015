@@ -12,15 +12,19 @@
 @(authorinfo "Andrew M. Kent" "Indiana University" "andmkent@indiana.edu")
 @(authorinfo "Sam Tobin-Hochstadt" "Indiana University" "samth@indiana.edu")
 
-@abstract{Typed Racket is a statically-typed dialect of Racket that
-allows idiomatic Racket programs to be enriched with types.  It can
-reason about many dynamically typed programming patterns @emph{while}
-providing sound interoperability and optimizations.  We have designed
-and are implementing an extension to Typed Racket which adds support
-for logical refinement types and linear integer constraints. This
-summary discusses our approach to implementing this novel combination
-of precise specifications and optimizations while maintaining sound
-interoperability with dynamically typed code.}
+@section{Introduction}
+
+Typed Racket is a statically-typed dialect of Racket that allows
+idiomatic Racket programs to be enriched with types.  It can reason
+about many dynamically typed programming patterns @emph{while}
+providing sound interoperability and optimizations.  We have
+designed@note{PLT Redex model of basic calculus describing our
+extension available at https://github.com/andmkent/stop2015-redex} and
+are implementing an extension to Typed Racket which adds support for
+logical refinement types and linear integer constraints. This summary
+discusses our approach to implementing this novel combination of
+precise specifications and optimizations while maintaining sound
+interoperability with dynamically typed code.
 
 @section{Refining @emph{already} logical types}
 
@@ -42,18 +46,14 @@ Float)] (@emph{an untagged union type describing values of type
 
 We then typecheck the body of the function starting with the
 @racket[if]'s test-expression, @racket[(fixnum? x)], recording the
-type-based logical propositions its result would imply: if the test
-evaluates to a non-@racket[#f] value then @racket[x] @emph{is} a
-@racket[Fixnum], otherwise @racket[(fixnum? x)] is @racket[#f] and
+type-based logical propositions its result would imply: if
+non-@racket[#f] then @racket[x] @emph{is} a @racket[Fixnum], otherwise
 @racket[x] @emph{is not} a @racket[Fixnum]. To typecheck the then- and
 else-branches, we combine the respective implied proposition with our
-initial assumption that @racket[x] is of type @racket[Fixnum]
-@emph{or} @racket[Float]. This allows us to correctly conclude that
-@racket[x] is a @racket[Fixnum] in @racket[(fx+ x 1)] and a
-@racket[Float] in @racket[(fl+ x 1.0)]. This not only allows Typed
-Racket to verify the type satefy of this function, but also allows for
-sound optimizations like replacing @racket[fx+] and @racket[fl+] with
-the faster unsafe verions @racket[unsafe-fx+] and @racket[unsafe-fl+].
+initial assumption that @racket[x] is of type @racket[(U Fixnum
+Float)]. This allows us to correctly conclude that @racket[x] is a
+@racket[Fixnum] in @racket[(fx+ x 1)] and a @racket[Float] in
+@racket[(fl+ x 1.0)].
 
 Our extension utilizes these same logical typed-based propositions
 @emph{within types} to naturally extend Typed Racket to relate the
