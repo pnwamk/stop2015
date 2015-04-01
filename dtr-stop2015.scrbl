@@ -3,9 +3,13 @@
 @(require scribble/manual
           andmkent-bib
           scriblib/autobib
-          scriblib/footnote)
+          scriblib/footnote
+          scribble/core)
           
 @(define-cite ~cite citet generate-bibliography)
+@(define (exact . items)
+   (make-element (make-style "identity" '(exact-chars))
+                 items))
 
 @(title "Adding Practical Dependent Types to Typed Racket")
 
@@ -17,14 +21,17 @@
 Typed Racket is a statically-typed dialect of Racket that allows
 idiomatic Racket programs to be enriched with types.  It can reason
 about many dynamically typed programming patterns @emph{while}
-providing sound interoperability and optimizations.  We have
-designed@note{PLT Redex model of basic calculus describing our
-extension available at https://github.com/andmkent/stop2015-redex} and
-are implementing an extension to Typed Racket which adds support for
-logical refinement types and linear integer constraints. This summary
-discusses our approach to implementing this novel combination of
-precise specifications and optimizations while maintaining sound
-interoperability with dynamically typed code.
+providing sound interoperability and optimizations.  We have designed
+and are implementing an extension to Typed Racket which adds support
+for logical refinement types and linear integer constraints. This
+summary discusses our approach to implementing this novel combination
+of precise specifications and optimizations while maintaining sound
+interoperability with dynamically typed code. A PLT Redex model of the
+basic calculus describing our extension can be seen at
+@exact{\texttt{\small{https://github.com/andmkent/stop2015-redex}}}
+and our development fork where we are extending Typed Racket is
+available at @exact{\texttt{\small{https://github.com/andmkent/typed-racket}}}.
+
 
 @section{Refining @emph{already} logical types}
 
