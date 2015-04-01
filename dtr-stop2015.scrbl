@@ -111,13 +111,13 @@ exact details of the logical propositions:
               [Float -> Float])]
 
 This allows for a convenient balance between precise specification and
-readable, intuitive type definitions and better models what many users
-had wanted @racket[case->] to provide for them all along.
+readable, intuitive type definitions and better models this common
+pattern found in dynamicly typed programs.
 
-@section{Verifying numeric constraints}
+@section{Verifying integer constraints}
 
 In addition to supporting refinements that relate run-time values'
-types, we support a decidable subset of integer constraints similar to
+types, we support a decidable subset of @bold{integer constraints} similar to
 those presented by @citet[xp-popl-1999] in Dependent ML. With this
 addition, Typed Racket will be able to automatically verify and
 eliminate many runtime checks for numeric constraints. For example, in
@@ -134,8 +134,7 @@ Furthermore, our extension will allow users to explicitly require the
 static enforcement of integer constraints by including them in the
 refinements of types. This allows a user to benefit from otherwise
 risky manual optimizations---such as explicit uses of
-@racket[unsafe-vector-ref] and the like---in a safe, statically
-verified fashion:
+@racket[unsafe-vector-ref]---in a safe, statically verified fashion:
 
 @racketblock[(define (safe-vec-ref
                       [v : (Vectorof Real)]
@@ -143,10 +142,11 @@ verified fashion:
                (unsafe-vector-ref v i))]
 
 
-This also provides a gradual process by which more of a program's
-specification may be statically checked. Here we can see how the
+This extension also provides additional ways a program's specification
+may be gradually converted into static types. Here we can see how the
 typechecker can enforce the precondition for vector
-@racket[dot-product] requiring the passed vectors be of equal length:
+@racket[dot-product] by explicitly requiring the passed vectors be of
+equal length:
 
 @racketblock[(define (dot-product [v1 : (Vectorof Real)]
                                   [v2 : (Vectorof Real)
@@ -165,24 +165,22 @@ behavior so their usages can be more precisely checked:
                                   (= m (+ 1 n))]]
               [Float -> Float])]
 
-
 @section{Interoperating with the dynamically typed world}
 
 Because of the relatively simple nature of our dependent types, it is
 easy to see the mapping between our type extensions and the well
 studied dependent contracts already present in Racket
 @~cite[dthf-esop-2012]. For example, the dependent specification we
-gave for @racket[plus1] is easy to express as a run-time contract:
+gave for @racket[plus1] is easily expressed as a run-time contract:
 
 @racketblock[(->i ([in (or/c fixnum? flonum?)])
                   [out (in) (or/c (and/c fixnum?
                                          (=/c (+ 1 in)))
                                   flonum?)])]
 
-Because of this, we anticipate being able to provide sound, performant
-interoperability between traditional Racket modules and Typed Racket
-modules utilizing dependent types with no additonal effort from our
-users.
+Because of this, we can provide sound, performant interoperability
+between traditional Racket modules and Typed Racket modules utilizing
+dependent types with no additonal effort from our users.
 
 @section{Dependently typing the numeric tower}
 
@@ -207,10 +205,10 @@ integers, we plan to explore the benefits and costs of using integer
 refinements in place of some of these simpler nominal integer
 subtypes (e.g. @racket[Byte]). It seems certain that more programs
 will typecheck when utilizing the more detailed types integer
-refinements can describe, but it is unclear how this will impact the
-performance of typechecking large complex numeric libraries. Upon
-completing our implementation of this system we plan to explore and
-report on these costs.
+refinements can describe, but it is unclear how this will impact
+performance when typechecking large and complex numeric
+libraries. Upon completing our implementation of this system we plan
+to explore and report on these costs.
 
 
 @section{Related Works}
@@ -244,12 +242,12 @@ JavaScript cannot.
 
 Sage's use of dynamic runtime checks and static types is similar to
 our approach for providing sound interoperability between dynamically
-and statically typed values, however their usage of first-class
-dependent types and arbitrary refinements means typechecking is
-undecidable @~cite[ktgff-tech-2007]. Our system instead utlizes a less
-expressive but decidable approach and forgoes the use of types as
+and statically typed values, however their usage of first-class types
+and arbitrary refinements means typechecking is undecidable
+@~cite[ktgff-tech-2007]. Our system instead utlizes a more
+conservative, decidable approach and forgos the use of types as
 first-class objects to maintain consistency between typed and untyped
-Racket programs.
-
+Racket programs. Also, our system is not limited to reasoning about a
+purely functional language.
 
 @generate-bibliography[]
