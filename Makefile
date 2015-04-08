@@ -1,11 +1,12 @@
 
 default: pdf
 
-pdf: dtr-stop2015.scrbl utils.tex
-	scribble --latex ++style utils.tex dtr-stop2015.scrbl && \
+pdf: ./dtr-stop2015.scrbl ./utils.tex
+	scribble --latex ++style utils.tex dtr-stop2015.scrbl
 	pdflatex dtr-stop2015.tex
 
 clean:
+	rm -f dtr-stop2015.tex
 	rm -f *.aux
 	rm -f *.log
 	rm -f *.out
